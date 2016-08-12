@@ -1,7 +1,7 @@
 ## Requirements
 
 ```
-sudo apt-get install -y sox virtualenv
+sudo apt-get install -y python-dev sox virtualenv
 ```
 
 ## Setup
