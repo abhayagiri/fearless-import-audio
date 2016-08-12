@@ -2,4 +2,6 @@
 
 base_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-"$base_dir/venv/bin/python" fearless-import-audio.py start
+cd "$base_dir"
+
+venv/bin/python fearless-import-audio.py start
