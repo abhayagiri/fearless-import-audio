@@ -97,7 +97,6 @@ class FearlessImportAudio:
 
     def loop_forever(self):
         while True:
-            logger.debug('yo')
             changes = self.file_changes(self.config['watch_dir'])
             for path in changes:
                 if self.is_complete(path):
@@ -107,16 +106,6 @@ class FearlessImportAudio:
                 else:
                     logger.debug('Waiting for %s' % path)
             time.sleep(1)
-
-    # def process(self, path):
-        # logger.info('Start %s' % watch_path)
-        # work_path = self.make_work_path(watch_path)
-        # logger.info('Move %s to %s' % (watch_path, work_path))
-        # os.rename(watch_path, work_path)
-        # output_path = self.make_output_path(work_path)
-        # logger.info('Convert %s to %s' % (work_path, output_path))
-        # self.convert_wav_to_flac(work_path, output_path)
-        # logger.info('End %s' % watch_path)
 
     def files_in_directory(self, path):
         result = {}
