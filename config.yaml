@@ -1,0 +1,20 @@
+#
+# Directories
+#
+watch_dir: work/watch
+queue_dir: work/queue
+output_dir: work/output
+#
+# Timezone
+#
+timezone: US/Pacific
+#
+# Logging
+#
+log_level: DEBUG
+log_path: work/log
+log_format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+#
+# PID
+#
+pid_path: work/pid
