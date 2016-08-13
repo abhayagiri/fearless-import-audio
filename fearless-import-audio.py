@@ -149,9 +149,9 @@ def start(config):
     instance.loop_forever()
 
 
-def shutdown():
+def shutdown(message, code):
     logger.info('Shutting down...')
-    pass
+    logger.debug(message)
 
 
 def setup_logging(config):
@@ -170,6 +170,7 @@ def load_config():
             config[key] = os.path.realpath(os.path.join(base_dir, config[key]))
     return config
 
+
 if __name__ == '__main__':
     config = load_config()
     setup_logging(config)
@@ -181,6 +182,8 @@ if __name__ == '__main__':
     def wrapper():
         try:
             start(config)
+        except SystemExit:
+            pass
         except:
             logger.exception('Uncaught exception')
     wrapper()
