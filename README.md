@@ -1,7 +1,13 @@
 ## Requirements
 
 ```
-sudo apt-get install -y python-dev sox virtualenv
+sudo apt-get install -y libtag1-dev python-dev sox virtualenv
+```
+
+```
+brew install python --universal --framework
+brew install taglib sox
+pip install virtualenv
 ```
 
 ## Setup

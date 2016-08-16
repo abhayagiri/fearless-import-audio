@@ -14,6 +14,7 @@ import click
 import daemonocle
 import plumbum
 import pytz
+import taglib
 import yaml
 
 
@@ -33,6 +34,7 @@ class ImportAudio:
     def __init__(self, config, path):
         self.config = config
         self.path = path
+        self.path_mtime = self._get_path_mtime()
         self.queue_path = self._make_queue_path()
         self.output_path = self._make_output_path()
 
@@ -51,29 +53,47 @@ class ImportAudio:
         ]
         exit, stdout, stderr = sox.run()
         open(self.queue_path + '.log', 'w').write(stdout + stderr)
+        file = taglib.File(self.output_path)
+        file.tags[u'ALBUM'] = [self.tag_album()]
+        file.tags[u'DATE'] = [self.tag_date()]
+        file.tags[u'COMMENT'] = [self.tag_comment()]
+        file.tags[u'GENRE'] = [u'Dhamma Talks']
+        file.save()
         logger.info('Conversion complete %s' % self.output_path)
+
+    def tag_album(self):
+        return u'{dt.year} Abhayagiri Dhamma Talks'.format(
+            dt=self.path_mtime)
+
+    def tag_date(self):
+        return unicode(self.path_mtime.strftime('%Y-%m-%d'))
+
+    def tag_comment(self):
+        return (u'This talk was offered on {dt:%B} {dt.day}, {dt.year}' +
+            u' at Abhayagiri Buddhist Monastery.').format(
+            dt=self.path_mtime)
 
     def _make_queue_path(self):
         basename = os.path.basename(self.path)
         now = datetime.datetime.now(pytz.timezone(self.config['timezone']))
         return os.path.join(
             config['queue_dir'],
-            now.strftime('%m_%d_%Y_%f_') + basename
+            now.strftime('%Y-%m-%d %H%M%S ') + basename
         )
 
     def _make_output_path(self):
         return os.path.join(
             self.config['output_dir'],
-            self._path_mtime().strftime('%m_%d_%Y'),
-            self._path_mtime().strftime('%m_%d_%Y') +
-                '_%.3f_Raw.flac' % self._seconds_since_midnight()
-            )
+            self.path_mtime.strftime('%Y-%m-%d'),
+            self.path_mtime.strftime('%Y-%m-%d %H%M%S') + ' Raw.flac'
+        )
+
     def _seconds_since_midnight(self):
         now = datetime.datetime.now(pytz.timezone(self.config['timezone']))
         midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
         return (now - midnight).total_seconds()
 
-    def _path_mtime(self):
+    def _get_path_mtime(self):
         mt = datetime.datetime.fromtimestamp(os.path.getmtime(self.path))
         mt = mt.replace(tzinfo=pytz.utc)
         return mt.astimezone(pytz.timezone(self.config['timezone']))
