@@ -13,6 +13,7 @@ import uuid
 import click
 import daemonocle
 import plumbum
+import portalocker
 import pytz
 import taglib
 import yaml
@@ -36,14 +37,15 @@ class ImportAudio:
         self.path = path
         self.path_mtime = self._get_path_mtime()
         self.queue_path = self._make_queue_path()
-        self.output_path = self._make_output_path()
+        self.output_path = None
 
     def convert(self):
         self.mkdir_p(os.path.dirname(self.queue_path))
-        self.mkdir_p(os.path.dirname(self.output_path))
         logger.info('Moving %s to %s' % (self.path, self.queue_path))
         os.rename(self.path, self.queue_path)
+        self.output_path = self._make_output_path()
         logger.info('Converting %s to %s' % (self.queue_path, self.output_path))
+        os.unlink(self.output_path)
         sox = plumbum.local['sox'][
             '-V3',
             '--no-clobber',
@@ -55,8 +57,10 @@ class ImportAudio:
         open(self.queue_path + '.log', 'w').write(stdout + stderr)
         file = taglib.File(self.output_path)
         file.tags[u'ALBUM'] = [self.tag_album()]
+        file.tags[u'YEAR'] = [self.tag_year()]
         file.tags[u'DATE'] = [self.tag_date()]
-        file.tags[u'COMMENT'] = [self.tag_comment()]
+        # This should be COMMENT but a bug in audacity requires it to be COMMENT?
+        file.tags[u'COMMENTS'] = [self.tag_comment()]
         file.tags[u'GENRE'] = [u'Dhamma Talks']
         file.save()
         logger.info('Conversion complete %s' % self.output_path)
@@ -64,6 +68,9 @@ class ImportAudio:
     def tag_album(self):
         return u'{dt.year} Abhayagiri Dhamma Talks'.format(
             dt=self.path_mtime)
+
+    def tag_year(self):
+        return unicode(self.path_mtime.strftime('%Y'))
 
     def tag_date(self):
         return unicode(self.path_mtime.strftime('%Y-%m-%d'))
@@ -82,11 +89,26 @@ class ImportAudio:
         )
 
     def _make_output_path(self):
-        return os.path.join(
+        base_dir = os.path.join(
             self.config['output_dir'],
-            self.path_mtime.strftime('%Y-%m-%d'),
-            self.path_mtime.strftime('%Y-%m-%d %H%M%S') + ' Raw.flac'
+            self.path_mtime.strftime('%Y-%m-%d')
         )
+        self.mkdir_p(base_dir)
+        tries = 0
+        while True:
+            if tries > 0:
+                try_str = '%d ' % tries
+            else:
+                try_str = ''
+            path = os.path.join(base_dir,
+                self.path_mtime.strftime('%Y-%m-%d ') + try_str + 'Raw.flac'
+            )
+            if os.path.exists(path):
+                logger.debug('File already exists %s, trying another...' % path)
+                tries += 1
+            else:
+                open(path, 'wb').write('')
+                return path
 
     def _seconds_since_midnight(self):
         now = datetime.datetime.now(pytz.timezone(self.config['timezone']))
@@ -117,15 +139,24 @@ class FearlessImportAudio:
 
     def loop_forever(self):
         while True:
-            changes = self.file_changes(self.config['watch_dir'])
-            for path in changes:
-                if self.is_complete(path):
+            try:
+                self.process()
+            except Exception as e:
+                logger.error('Got exception %s' % e)
+            time.sleep(1)
+
+    def process(self):
+        for path in self.files_in_directory(self.config['watch_dir']):
+            if path.lower().endswith('.wav'):
+                if self.wav_is_complete(path):
                     time.sleep(1) # Wait a little bit...
                     import_audio = ImportAudio(self.config, path)
                     import_audio.convert()
                 else:
                     logger.debug('Waiting for %s' % path)
-            time.sleep(1)
+            else:
+                # Ignore
+                pass
 
     def files_in_directory(self, path):
         result = {}
@@ -138,27 +169,14 @@ class FearlessImportAudio:
                     pass
         return result
 
-    def file_changes(self, path):
-        result = []
-        after = self.files_in_directory(path)
-        before = self.before
-        if before is not None:
-            for f, after_st in after.iteritems():
-                if f not in before or \
-                       before[f].st_size != after_st.st_size or \
-                       before[f].st_mtime != after_st.st_mtime:
-                   result.append(f)
-        self.before = after
-        return result
-
-    def is_complete(self, path):
+    def wav_is_complete(self, path):
         try:
             file = open(path, 'rb')
             buf = file.read(16)
             file_size = os.path.getsize(path)
         except OSError:
             return False
-        if (buf[0:4] != 'RIFF') or (buf[12:16] != 'fmt '): 
+        if (buf[0:4] != 'RIFF') or (buf[12:16] != 'fmt '):
             return False # not a WAV
         return struct.unpack('<L', buf[4:8])[0] + 8 == file_size
 

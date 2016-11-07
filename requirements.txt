@@ -3,3 +3,5 @@ daemonocle>=1.0.1
 plumbum>=1.6.2
 pytz>=2016.6.1
 PyYAML>=3.11
+pytaglib>=1.3.0
+portalocker>=1.0.0
